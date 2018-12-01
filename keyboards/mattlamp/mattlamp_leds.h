@@ -1,5 +1,4 @@
-#ifndef __MATTLAMP_LEDS_H__
-#define __MATTLAMP_LEDS_H__
+#pragma once
 
 #include <stdlib.h>
 #include <stdbool.h>
@@ -57,5 +56,3 @@ void mattlamp_leds_set_all(uint8_t r, uint8_t g, uint8_t b);
 void mattlamp_leds_set_one(uint8_t r, uint8_t g, uint8_t b, uint8_t i);
 
 bool mattlamp_leds_get_status(uint8_t i, uint8_t* r, uint8_t* g, uint8_t* b);
-
-#endif

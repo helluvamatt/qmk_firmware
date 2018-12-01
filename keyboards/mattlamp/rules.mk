@@ -53,5 +53,5 @@ BACKLIGHT_ENABLE  = no  # Custom backlighting code is used, so this should not b
 AUDIO_ENABLE      = no  # This can be enabled if a speaker is connected to the expansion port. Not compatible with RGBLIGHT below
 RGBLIGHT_ENABLE   = no  # We call WS2812 directly
 
-# Call WS2812 directly
-SRC += ws2812.c mattlamp_leds.c mattlamp_keys.c
+# Compile custom modules
+SRC += ws2812.c mattlamp_leds.c mattlamp_keys.c mattlamp_switches.c

@@ -1,5 +1,4 @@
-#ifndef __MATTLAMP_KEYS_H__
-#define __MATTLAMP_KEYS_H__
+#pragma once
 
 #include <stdlib.h>
 #include <stdbool.h>
@@ -37,5 +36,3 @@ union keys_config_u {
 void mattlamp_keys_init(void);
 void mattlamp_keys_pressed(void);
 bool mattlamp_keys_config(uint8_t action, uint8_t param1, uint8_t param2);
-
-#endif

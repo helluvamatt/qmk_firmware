@@ -19,9 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "mattlamp.h"
 #include "mattlamp_leds.h"
 #include "mattlamp_keys.h"
+#include "mattlamp_switches.h"
 #include "raw_hid.h"
 #include "usb_descriptor.h"
-#include "lufa.h"
 
 enum hid_pkt_req {
 	HID_PKT_REQ_PING,
@@ -31,9 +31,10 @@ enum hid_pkt_req {
 	HID_PKT_REQ_CONFIG_LED_GET,
 	HID_PKT_REQ_LED_SET_ALL,
 	HID_PKT_REQ_LED_SET_ONE,
-	HID_PKT_REQ_LED_COUNT,
+	HID_PKT_REQ_DEVICE_PARAMS,
 	HID_PKT_REQ_LED_STATUS,
-	HID_PKT_REQ_COMMIT_LED_CONFIG
+	HID_PKT_REQ_COMMIT_LED_CONFIG,
+	HID_PKT_REQ_SWITCH_STATE,
 };
 
 enum hid_pkt_res {
@@ -43,14 +44,18 @@ enum hid_pkt_res {
 };
 
 enum mattlamp_keycodes {
-	KC_ONE = SAFE_RANGE
+	KC_ONE = SAFE_RANGE,
+	KC_SW1,
+	KC_SW2,
+	KC_SW3
 };
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
-	LAYOUT(KC_ONE),
+	LAYOUT( KC_ONE ),
 };
 
-bool initialized = false;
+static bool initialized = false;
+static bool switch_states[SWITCHES_COUNT];
 
 // Low-level matrix init function
 void matrix_init_user(void) {
@@ -59,6 +64,7 @@ void matrix_init_user(void) {
 		print("Initializing in matrix_init_user...\n");
 		mattlamp_leds_init();
 		mattlamp_keys_init();
+		mattlamp_switches_init();
 		initialized = true;
 	}
 }
@@ -67,6 +73,22 @@ void matrix_init_user(void) {
 void matrix_scan_user(void) {
 	// Advance our LED animations
 	mattlamp_leds_frame();
+
+	// Process switches
+	mattlamp_switches_read();
+	for (uint8_t i = 0; i < SWITCHES_COUNT; i++) {
+		bool sw = mattlamp_switches_get(i);
+		if (sw != switch_states[i]) {
+			switch_states[i] = sw;
+			// TODO Decide what to do when the switch state changes
+			if (sw) {
+				xprintf("SW%u turned on\n", i+1);
+			} else {
+				xprintf("SW%u turned off\n", i+1);
+			}
+		}
+	}
+
 }
 
 // Handle the key events
@@ -119,9 +141,10 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
 			send_buffer[0] = HID_PKT_RES_ACK;
 			raw_hid_send(send_buffer, RAW_EPSIZE);
 			break;
-		case HID_PKT_REQ_LED_COUNT:
+		case HID_PKT_REQ_DEVICE_PARAMS:
 			send_buffer[0] = HID_PKT_RES_ACK;
 			send_buffer[1] = RGBLED_NUM;
+			send_buffer[2] = SWITCHES_COUNT;
 			raw_hid_send(send_buffer, RAW_EPSIZE);
 			break;
 		case HID_PKT_REQ_LED_STATUS:
@@ -144,6 +167,14 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
 		case HID_PKT_REQ_COMMIT_LED_CONFIG:
 			mattlamp_leds_commit();
 			send_buffer[0] = HID_PKT_RES_ACK;
+			raw_hid_send(send_buffer, RAW_EPSIZE);
+			break;
+		case HID_PKT_REQ_SWITCH_STATE:
+			send_buffer[0] = HID_PKT_RES_ACK;
+			send_buffer[1] = SWITCHES_COUNT;
+			for (uint8_t i = 0; i < SWITCHES_COUNT; i++) {
+				send_buffer[i / 8 + 2] |= (switch_states[i] & 0x1u) << (i % 8);
+			}
 			raw_hid_send(send_buffer, RAW_EPSIZE);
 			break;
 		default:
