@@ -1,4 +1,4 @@
-#include QMK_KEYBOARD_H
+#include "ctrl.h" // QMK_KEYBOARD_H
 
 enum ctrl_keycodes {
     L_BRI = SAFE_RANGE, //LED Brightness Increase
@@ -91,13 +91,13 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             return false;
         case L_PTN:
             if (record->event.pressed) {
-                if (led_animation_id == led_setups_count - 1) led_animation_id = 0;
+                if (led_animation_id == led_setups_count) led_animation_id = 0;
                 else led_animation_id++;
             }
             return false;
         case L_PTP:
             if (record->event.pressed) {
-                if (led_animation_id == 0) led_animation_id = led_setups_count - 1;
+                if (led_animation_id == 0) led_animation_id = led_setups_count;
                 else led_animation_id--;
             }
             return false;

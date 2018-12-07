@@ -50,6 +50,12 @@ typedef struct issi3733_driver_s {
     uint8_t conf[ISSI3733_PG_FN_BYTES];     //PG3 - Function Register
 } issi3733_driver_t;
 
+typedef struct issi3733_color_s {
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+} issi3733_color_t;
+
 typedef struct issi3733_rgb_s {
     uint8_t *r;         //Direct access into PWM data
     uint8_t *g;         //Direct access into PWM data
@@ -92,7 +98,8 @@ void rgb_matrix_init_user(void);
 #define LED_MODE_KEYS_ONLY          1
 #define LED_MODE_NON_KEYS_ONLY      2
 #define LED_MODE_INDICATORS_ONLY    3
-#define LED_MODE_MAX_INDEX          LED_MODE_INDICATORS_ONLY   //Must be highest value
+#define LED_MODE_EXTERNAL           4
+#define LED_MODE_MAX_INDEX          LED_MODE_EXTERNAL   //Must be highest value
 
 #define EF_NONE         0x00000000  //No effect
 #define EF_OVER         0x00000001  //Overwrite any previous color information with new
@@ -160,9 +167,20 @@ extern uint32_t layer_state;
 extern issi3733_led_t *led_cur;
 extern issi3733_led_t *lede;
 
+extern issi3733_color_t live_map[];
+
 void led_matrix_run(void);
 void led_matrix_task(void);
 
 void gcr_compute(void);
+
+void led_matrix_get_disp_size(float* l, float* t, float* r, float* b, float* w, float* h);
+
+void led_matrix_set_custom_pattern(issi3733_rgb_t* color_bands, uint8_t color_bands_count, uint8_t repeat, uint32_t flags);
+
+void led_matrix_set(uint8_t i, uint8_t r, uint8_t g, uint8_t b);
+void led_matrix_set_all(uint8_t r, uint8_t g, uint8_t b);
+
+uint8_t led_matrix_get(uint8_t i, uint8_t* r, uint8_t* g, uint8_t* b, float* x, float* y);
 
 #endif //_LED_MATRIX_H_

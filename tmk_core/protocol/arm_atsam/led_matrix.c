@@ -53,6 +53,8 @@ issi3733_driver_t issidrv[ISSI3733_DRIVER_COUNT];
 issi3733_led_t led_map[ISSI3733_LED_COUNT+1] = ISSI3733_LED_MAP;
 issi3733_led_t *lede = led_map + ISSI3733_LED_COUNT; //End pointer of mapping
 
+issi3733_color_t live_map[ISSI3733_LED_COUNT];
+
 uint8_t gcr_desired;
 uint8_t gcr_breathe;
 uint8_t gcr_use;
@@ -241,6 +243,44 @@ void led_matrix_prepare(void)
     disp_pixel_setup();
 }
 
+void led_matrix_get_disp_size(float* l, float* t, float* r, float* b, float* w, float* h)
+{
+    *l = disp.left;
+    *t = disp.top;
+    *r = disp.right;
+    *b = disp.bottom;
+    *w = disp.width;
+    *h = disp.height;
+}
+
+static led_setup_t* led_custom_pattern = NULL;
+
+void led_matrix_set_custom_pattern(issi3733_rgb_t* color_bands, uint8_t color_bands_count, uint8_t repeat, uint32_t flags)
+{
+  uint32_t count = (uint32_t)color_bands_count * (uint32_t)repeat;
+  float width = 100.0f / (float)count;
+  if (led_custom_pattern != NULL) free(led_custom_pattern);
+  led_custom_pattern = (led_setup_t*)malloc(sizeof(led_setup_t) * (count + 1));
+  if (led_custom_pattern != NULL)
+  {
+    for (uint32_t i = 0; i < count; i++)
+    {
+      uint32_t c_i = i % repeat;
+      uint32_t c_n = (i + 1) % repeat;
+      led_custom_pattern[i].hs = i * width;
+      led_custom_pattern[i].he = (i + 1) * width;
+      led_custom_pattern[i].rs = *color_bands[c_i].r;
+      led_custom_pattern[i].gs = *color_bands[c_i].g;
+      led_custom_pattern[i].bs = *color_bands[c_i].b;
+      led_custom_pattern[i].re = *color_bands[c_n].r;
+      led_custom_pattern[i].ge = *color_bands[c_n].g;
+      led_custom_pattern[i].be = *color_bands[c_n].b;
+      led_custom_pattern[i].ef = flags;
+    }
+    led_custom_pattern[count].end = 1;
+  }
+}
+
 uint8_t led_enabled;
 float led_animation_speed;
 uint8_t led_animation_direction;
@@ -258,7 +298,40 @@ uint8_t led_per_run = 15;
 float breathe_mult;
 float pxmod;
 
+void led_matrix_set(uint8_t i, uint8_t r, uint8_t g, uint8_t b)
+{
+  if (i < ISSI3733_LED_COUNT)
+  {
+    live_map[i].r = r;
+    live_map[i].g = g;
+    live_map[i].b = b;
+  }
+}
+
+void led_matrix_set_all(uint8_t r, uint8_t g, uint8_t b)
+{
+  for (uint8_t i = 0; i < ISSI3733_LED_COUNT; i++)
+  {
+    live_map[i].r = r;
+    live_map[i].g = g;
+    live_map[i].b = b;
+  }
+}
+
+uint8_t led_matrix_get(uint8_t i, uint8_t* r, uint8_t* g, uint8_t* b, float* x, float* y)
+{
+  if (i >= ISSI3733_LED_COUNT) return false;
+  *r = live_map[i].r;
+  *g = live_map[i].g;
+  *b = live_map[i].b;
+  if (x != NULL) *x = led_map[i].x;
+  if (y != NULL) *y = led_map[i].y;
+  return true;
+}
+
 void led_run_pattern(led_setup_t *f, float* ro, float* go, float* bo, float pxs) {
+    if (f == NULL) return;
+
     float px;
 
     while (f->end != 1)
@@ -326,7 +399,7 @@ void led_matrix_run(void)
     float go;
     float bo;
     uint8_t led_this_run = 0;
-    led_setup_t *f = (led_setup_t*)led_setups[led_animation_id];
+    led_setup_t *f = led_animation_id < led_setups_count ? (led_setup_t*)led_setups[led_animation_id] : led_custom_pattern;
 
     if (led_cur == 0) //Denotes start of new processing cycle in the case of chunked processing
     {
@@ -373,117 +446,131 @@ void led_matrix_run(void)
         go = 0;
         bo = 0;
 
-        if (led_lighting_mode == LED_MODE_KEYS_ONLY && led_cur->scan == 255)
+        if (led_lighting_mode != LED_MODE_EXTERNAL)
         {
-            //Do not act on this LED
-        }
-        else if (led_lighting_mode == LED_MODE_NON_KEYS_ONLY && led_cur->scan != 255)
-        {
-            //Do not act on this LED
-        }
-        else if (led_lighting_mode == LED_MODE_INDICATORS_ONLY)
-        {
-            //Do not act on this LED (Only show indicators)
-        }
-        else
-        {
-            led_instruction_t *led_cur_instruction;
-            led_cur_instruction = led_instructions;
 
-            //Act on LED
-            if (led_cur_instruction->end) {
-                // If no instructions, use normal pattern
-                led_run_pattern(f, &ro, &go, &bo, led_cur->px);
-            } else {
-                uint8_t skip;
-                uint8_t modid = (led_cur->id - 1) / 32;                         //PS: Calculate which id# contains the led bit
-                uint32_t modidbit = 1 << ((led_cur->id - 1) % 32);              //PS: Calculate the bit within the id#
-                uint32_t *bitfield;                                             //PS: Will point to the id# within the current instruction
+            if (led_lighting_mode == LED_MODE_KEYS_ONLY && led_cur->scan == 255)
+            {
+                //Do not act on this LED
+            }
+            else if (led_lighting_mode == LED_MODE_NON_KEYS_ONLY && led_cur->scan != 255)
+            {
+                //Do not act on this LED
+            }
+            else if (led_lighting_mode == LED_MODE_INDICATORS_ONLY)
+            {
+                //Do not act on this LED (Only show indicators)
+            }
+            else
+            {
+                led_instruction_t *led_cur_instruction;
+                led_cur_instruction = led_instructions;
 
-                while (!led_cur_instruction->end) {
-                    skip = 0;
+                //Act on LED
+                if (led_cur_instruction->end) {
+                    // If no instructions, use normal pattern
+                    led_run_pattern(f, &ro, &go, &bo, led_cur->px);
+                } else {
+                    uint8_t skip;
+                    uint8_t modid = (led_cur->id - 1) / 32;                         //PS: Calculate which id# contains the led bit
+                    uint32_t modidbit = 1 << ((led_cur->id - 1) % 32);              //PS: Calculate the bit within the id#
+                    uint32_t *bitfield;                                             //PS: Will point to the id# within the current instruction
 
-                    //PS: Check layer active first
-                    if (led_cur_instruction->flags & LED_FLAG_MATCH_LAYER) {
-                        if (led_cur_instruction->layer != highest_active_layer) {
-                            skip = 1;
-                        }
-                    }
+                    while (!led_cur_instruction->end) {
+                        skip = 0;
 
-                    if (!skip)
-                    {
-                        if (led_cur_instruction->flags & LED_FLAG_MATCH_ID) {
-                            bitfield = &led_cur_instruction->id0 + modid;       //PS: Add modid as offset to id0 address. *bitfield is now idX of the led id
-                            if (~(*bitfield) & modidbit) {                      //PS: Check if led bit is not set in idX
+                        //PS: Check layer active first
+                        if (led_cur_instruction->flags & LED_FLAG_MATCH_LAYER) {
+                            if (led_cur_instruction->layer != highest_active_layer) {
                                 skip = 1;
                             }
                         }
-                    }
 
-                    if (!skip) {
-                        if (led_cur_instruction->flags & LED_FLAG_USE_RGB) {
-                            ro = led_cur_instruction->r;
-                            go = led_cur_instruction->g;
-                            bo = led_cur_instruction->b;
-                        } else if (led_cur_instruction->flags & LED_FLAG_USE_PATTERN) {
-                            led_run_pattern(led_setups[led_cur_instruction->pattern_id], &ro, &go, &bo, led_cur->px);
-                        } else if (led_cur_instruction->flags & LED_FLAG_USE_ROTATE_PATTERN) {
-                            led_run_pattern(f, &ro, &go, &bo, led_cur->px);
+                        if (!skip)
+                        {
+                            if (led_cur_instruction->flags & LED_FLAG_MATCH_ID) {
+                                bitfield = &led_cur_instruction->id0 + modid;       //PS: Add modid as offset to id0 address. *bitfield is now idX of the led id
+                                if (~(*bitfield) & modidbit) {                      //PS: Check if led bit is not set in idX
+                                    skip = 1;
+                                }
+                            }
                         }
-                    }
 
-                    led_cur_instruction++;
+                        if (!skip) {
+                            if (led_cur_instruction->flags & LED_FLAG_USE_RGB) {
+                                ro = led_cur_instruction->r;
+                                go = led_cur_instruction->g;
+                                bo = led_cur_instruction->b;
+                            } else if (led_cur_instruction->flags & LED_FLAG_USE_PATTERN) {
+                                led_run_pattern(led_setups[led_cur_instruction->pattern_id], &ro, &go, &bo, led_cur->px);
+                            } else if (led_cur_instruction->flags & LED_FLAG_USE_ROTATE_PATTERN) {
+                                led_run_pattern(f, &ro, &go, &bo, led_cur->px);
+                            }
+                        }
+
+                        led_cur_instruction++;
+                    }
                 }
             }
-        }
 
-        //Clamp values 0-255
-        if (ro > 255) ro = 255; else if (ro < 0) ro = 0;
-        if (go > 255) go = 255; else if (go < 0) go = 0;
-        if (bo > 255) bo = 255; else if (bo < 0) bo = 0;
+            //Clamp values 0-255
+            if (ro > 255) ro = 255; else if (ro < 0) ro = 0;
+            if (go > 255) go = 255; else if (go < 0) go = 0;
+            if (bo > 255) bo = 255; else if (bo < 0) bo = 0;
 
-        if (led_animation_breathing)
-        {
-            ro *= breathe_mult;
-            go *= breathe_mult;
-            bo *= breathe_mult;
-        }
+            if (led_animation_breathing)
+            {
+                ro *= breathe_mult;
+                go *= breathe_mult;
+                bo *= breathe_mult;
+            }
 
-        *led_cur->rgb.r = (uint8_t)ro;
-        *led_cur->rgb.g = (uint8_t)go;
-        *led_cur->rgb.b = (uint8_t)bo;
+            uint8_t r = (uint8_t)ro;
+            uint8_t g = (uint8_t)go;
+            uint8_t b = (uint8_t)bo;
 
 #ifdef USB_LED_INDICATOR_ENABLE
-        if (keyboard_leds())
-        {
-            uint8_t kbled = keyboard_leds();
-            if (
-                #if USB_LED_NUM_LOCK_SCANCODE != 255
-                (led_cur->scan == USB_LED_NUM_LOCK_SCANCODE && kbled & (1<<USB_LED_NUM_LOCK)) ||
-                #endif //NUM LOCK
-                #if USB_LED_CAPS_LOCK_SCANCODE != 255
-                (led_cur->scan == USB_LED_CAPS_LOCK_SCANCODE && kbled & (1<<USB_LED_CAPS_LOCK)) ||
-                #endif //CAPS LOCK
-                #if USB_LED_SCROLL_LOCK_SCANCODE != 255
-                (led_cur->scan == USB_LED_SCROLL_LOCK_SCANCODE && kbled & (1<<USB_LED_SCROLL_LOCK)) ||
-                #endif //SCROLL LOCK
-                #if USB_LED_COMPOSE_SCANCODE != 255
-                (led_cur->scan == USB_LED_COMPOSE_SCANCODE && kbled & (1<<USB_LED_COMPOSE)) ||
-                #endif //COMPOSE
-                #if USB_LED_KANA_SCANCODE != 255
-                (led_cur->scan == USB_LED_KANA_SCANCODE && kbled & (1<<USB_LED_KANA)) ||
-                #endif //KANA
-                (0))
+            if (keyboard_leds())
             {
-                if (*led_cur->rgb.r > 127) *led_cur->rgb.r = 0;
-                else *led_cur->rgb.r = 255;
-                if (*led_cur->rgb.g > 127) *led_cur->rgb.g = 0;
-                else *led_cur->rgb.g = 255;
-                if (*led_cur->rgb.b > 127) *led_cur->rgb.b = 0;
-                else *led_cur->rgb.b = 255;
+                uint8_t kbled = keyboard_leds();
+                if (
+                    #if USB_LED_NUM_LOCK_SCANCODE != 255
+                    (led_cur->scan == USB_LED_NUM_LOCK_SCANCODE && kbled & (1<<USB_LED_NUM_LOCK)) ||
+                    #endif //NUM LOCK
+                    #if USB_LED_CAPS_LOCK_SCANCODE != 255
+                    (led_cur->scan == USB_LED_CAPS_LOCK_SCANCODE && kbled & (1<<USB_LED_CAPS_LOCK)) ||
+                    #endif //CAPS LOCK
+                    #if USB_LED_SCROLL_LOCK_SCANCODE != 255
+                    (led_cur->scan == USB_LED_SCROLL_LOCK_SCANCODE && kbled & (1<<USB_LED_SCROLL_LOCK)) ||
+                    #endif //SCROLL LOCK
+                    #if USB_LED_COMPOSE_SCANCODE != 255
+                    (led_cur->scan == USB_LED_COMPOSE_SCANCODE && kbled & (1<<USB_LED_COMPOSE)) ||
+                    #endif //COMPOSE
+                    #if USB_LED_KANA_SCANCODE != 255
+                    (led_cur->scan == USB_LED_KANA_SCANCODE && kbled & (1<<USB_LED_KANA)) ||
+                    #endif //KANA
+                    (0))
+                {
+                    if  (r > 127) r = 0;
+                    else r = 255;
+                    if  (g > 127) g = 0;
+                    else g = 255;
+                    if  (b > 127) b = 0;
+                    else b = 255;
+                }
             }
-        }
+
+            // Update live map
+            live_map[led_cur->id - 1].r = r;
+            live_map[led_cur->id - 1].g = g;
+            live_map[led_cur->id - 1].b = b;
+
 #endif //USB_LED_INDICATOR_ENABLE
+        } // led_lighting_mode != LED_MODE_EXTERNAL
+
+        *led_cur->rgb.r = live_map[led_cur->id - 1].r;
+        *led_cur->rgb.g = live_map[led_cur->id - 1].g;
+        *led_cur->rgb.b = live_map[led_cur->id - 1].b;
 
         led_cur++;
         led_this_run++;
@@ -529,7 +616,7 @@ void rgb_matrix_init_user(void) {
 
 }
 
-#define LED_UPDATE_RATE 10  //ms
+#define LED_UPDATE_RATE 15  //ms
 
 //led data processing can take time, so process data in chunks to free up the processor
 //this is done through led_cur and lede

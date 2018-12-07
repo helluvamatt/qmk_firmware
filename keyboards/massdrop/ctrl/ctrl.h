@@ -1,6 +1,7 @@
 #pragma once
 
 #include "quantum.h"
+#include "config.h"
 #include "config_led.h"
 #include "matrix.h"
 
@@ -40,3 +41,22 @@
             dprintf(name " enabled\r\n"); \
         } \
     }
+
+enum hid_pkt_req {
+	HID_PKT_REQ_PING,
+	HID_PKT_REQ_CONFIG_LED_SET,
+	HID_PKT_REQ_CONFIG_LED_GET,
+	HID_PKT_REQ_LED_SET_ALL,
+	HID_PKT_REQ_LED_SET,
+	HID_PKT_REQ_DEVICE_PARAMS,
+	HID_PKT_REQ_COMMIT_LED_CONFIG,
+  HID_PKT_REQ_LED_GET,
+  HID_PKT_REQ_LEDS_GET,
+  HID_PKT_REQ_LED_PATTERN_SET,
+};
+
+enum hid_pkt_res {
+	HID_PKT_RES_ACK,
+	HID_PKT_RES_ERR,
+	HID_PKT_RES_MORE,
+};
