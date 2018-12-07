@@ -203,13 +203,6 @@ void main_subtask_usb_state(void)
     }
 }
 
-void main_subtask_led(void)
-{
-    if (g_usb_state != USB_FSMSTATUS_FSMSTATE_ON_Val) return; //Only run LED tasks if USB is operating
-
-    led_matrix_task();
-}
-
 void main_subtask_power_check(void)
 {
     static uint64_t next_5v_checkup = 0;
@@ -221,7 +214,9 @@ void main_subtask_power_check(void)
         v_5v = adc_get(ADC_5V);
         v_5v_avg = 0.9 * v_5v_avg + 0.1 * v_5v;
 
+#ifdef RGB_MATRIX_ENABLE
         gcr_compute();
+#endif
     }
 }
 
@@ -247,7 +242,6 @@ void main_subtask_raw(void)
 void main_subtasks(void)
 {
     main_subtask_usb_state();
-    main_subtask_led();
     main_subtask_power_check();
     main_subtask_usb_extra_device();
 #ifdef RAW_ENABLE
@@ -268,7 +262,9 @@ int main(void)
 
     SPI_Init();
 
+#ifdef RGB_MATRIX_ENABLE
     i2c1_init();
+#endif
 
     matrix_init();
 
@@ -287,8 +283,7 @@ int main(void)
     led_off;
     m15_off;
 
-    led_matrix_init();
-
+#ifdef RGB_MATRIX_ENABLE
     while (I2C3733_Init_Control() != 1) {}
     while (I2C3733_Init_Drivers() != 1) {}
 
@@ -298,6 +293,7 @@ int main(void)
 
     for (uint8_t drvid = 0; drvid < ISSI3733_DRIVER_COUNT; drvid++)
         I2C_LED_Q_ONOFF(drvid); //Queue data
+#endif // RGB_MATRIX_ENABLE
 
     keyboard_setup();
 

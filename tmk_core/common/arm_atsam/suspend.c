@@ -1,6 +1,8 @@
 #include "matrix.h"
 #include "i2c_master.h"
-#include "led_matrix.h"
+#ifdef RGB_MATRIX_ENABLE
+#include "rgb_matrix.h"
+#endif
 #include "suspend.h"
 
 /** \brief Suspend idle
@@ -35,7 +37,10 @@ void suspend_power_down_kb(void) {
  */
 void suspend_power_down(void)
 {
+#ifdef RGB_MATRIX_ENABLE
     I2C3733_Control_Set(0); //Disable LED driver
+    rgb_matrix_set_suspend_state(true);
+#endif
 
     suspend_power_down_kb();
 }
@@ -76,9 +81,12 @@ void suspend_wakeup_init_kb(void) {
  */
 void suspend_wakeup_init(void) {
     /* If LEDs are set to enabled, enable the hardware */
-    if (led_enabled) {
+#ifdef RGB_MATRIX_ENABLE
+    if (rgb_matrix_config.enable) {
+        rgb_matrix_set_suspend_state(false);
         I2C3733_Control_Set(1);
     }
+#endif
 
     suspend_wakeup_init_kb();
 }

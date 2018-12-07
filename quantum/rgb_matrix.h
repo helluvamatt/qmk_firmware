@@ -68,6 +68,8 @@ typedef union {
   };
 } rgb_config_t;
 
+extern rgb_config_t rgb_matrix_config;
+
 enum rgb_matrix_effects {
 	RGB_MATRIX_SOLID_COLOR = 1,
 #ifndef DISABLE_RGB_MATRIX_ALPHAS_MODS
@@ -127,6 +129,7 @@ enum rgb_matrix_effects {
 };
 
 void rgb_matrix_set_color( int index, uint8_t red, uint8_t green, uint8_t blue );
+void rgb_matrix_set_color_all( uint8_t red, uint8_t green, uint8_t blue );
 
 // This runs after another backlight effect and replaces
 // colors already set

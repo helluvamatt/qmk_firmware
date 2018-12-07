@@ -2,8 +2,13 @@
 #include "clks.h"
 #include <string.h>
 
-#include "usb/udi_device_epsize.h"
+#ifdef RGB_MATRIX_ENABLE
 #include "led_matrix.h"
+#include "rgb_matrix.h"
+#include "config_led.h"
+#endif
+#ifdef RAW_ENABLE
+#include "usb/udi_device_epsize.h"
 #include "raw_hid.h"
 
 void raw_hid_receive(uint8_t *data, uint8_t length) {
@@ -18,8 +23,10 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
     case HID_PKT_REQ_PING:
       raw_hid_send(send_buffer, RAW_EPSIZE);
       break;
+#ifdef RGB_MATRIX_ENABLE
     case HID_PKT_REQ_CONFIG_LED_SET:
       {
+        /*
         led_enabled = data[4] != 0;
         if (data[5] <= LED_MODE_MAX_INDEX) led_lighting_mode = data[5];
         if (data[6] <= LED_GCR_MAX) gcr_desired = data[6];
@@ -33,11 +40,13 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
         led_animation_speed = new_speed;
         I2C3733_Control_Set(led_enabled);
         if (led_animation_breathing) gcr_breathe = gcr_desired;
+        */
         raw_hid_send(send_buffer, RAW_EPSIZE);
         break;
       }
     case HID_PKT_REQ_CONFIG_LED_GET:
       {
+        /*
         uint8_t* speed_arr = (uint8_t *)(&led_animation_speed); // WARNING: Assumes MCU is little endian/network byte order!
         send_buffer[4] = led_enabled;
         send_buffer[5] = led_lighting_mode;
@@ -48,11 +57,12 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
         send_buffer[10] = led_animation_breathing;
         send_buffer[11] = led_animation_direction;
         memcpy(&send_buffer[12], speed_arr, sizeof(float));
+        */
         raw_hid_send(send_buffer, RAW_EPSIZE);
         break;
       }
     case HID_PKT_REQ_LED_SET_ALL:
-      led_matrix_set_all(data[4], data[5], data[6]);
+      rgb_matrix_set_color_all(data[4], data[5], data[6]);
 			raw_hid_send(send_buffer, RAW_EPSIZE);
       break;
     case HID_PKT_REQ_LED_SET:
@@ -66,7 +76,7 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
           uint8_t r = data[offset++];
           uint8_t g = data[offset++];
           uint8_t b = data[offset++];
-          led_matrix_set(i - 1, r, g, b);
+          rgb_matrix_set_color(i - 1, r, g, b);
         }
         raw_hid_send(send_buffer, RAW_EPSIZE);
         break;
@@ -127,23 +137,7 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
         raw_hid_send(send_buffer, RAW_EPSIZE);
         break;
       }
-    case HID_PKT_REQ_LED_PATTERN_SET:
-      {
-        uint8_t count = data[4];
-        if (count > 10) count = 10;
-        uint8_t repeat = data[5];
-        if (repeat > 8) repeat = 8;
-        issi3733_rgb_t colors[count];
-        for (uint8_t i = 0; i < count; i++)
-        {
-          *colors[i].r = data[7+i*3];
-          *colors[i].g = data[8+i*3];
-          *colors[i].b = data[9+i*3];
-        }
-        led_matrix_set_custom_pattern(colors, count, repeat, data[6]);
-        raw_hid_send(send_buffer, RAW_EPSIZE);
-        break;
-      }
+#endif // RGB_MATRIX_ENABLE
     default:
 			// Unknown message, send error
 			send_buffer[0] = HID_PKT_RES_ERR;
@@ -151,3 +145,137 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
       break;
   }
 }
+#endif // RAW_ENABLE
+
+#ifdef RGB_MATRIX_ENABLE
+
+const rgb_led g_rgb_leds[DRIVER_LED_TOTAL] = {
+  // KC_ESC, KC_F1, KC_F2, KC_F3, KC_F4, KC_F5, KC_F6, KC_F7, KC_F8, KC_F9, KC_F10, KC_F11, KC_F12, KC_PSCR, KC_SLCK, KC_PAUS
+  { { 0|(0<<4) }, { 7, 5 }, 0 },
+  { { 0|(1<<4) }, { 31, 5 }, 0 },
+  { { 0|(2<<4) }, { 43, 5 }, 0 },
+  { { 0|(3<<4) }, { 55, 5 }, 0 },
+  { { 0|(4<<4) }, { 67, 5 }, 0 },
+  { { 0|(5<<4) }, { 85, 5 }, 0 },
+  { { 0|(6<<4) }, { 97, 5 }, 0 },
+  { { 0|(7<<4) }, { 109, 5 }, 0 },
+  { { 6|(0<<4) }, { 121, 5 }, 0 },
+  { { 6|(1<<4) }, { 139, 5 }, 0 },
+  { { 6|(2<<4) }, { 151, 5 }, 0 },
+  { { 6|(3<<4) }, { 163, 5 }, 0 },
+  { { 6|(4<<4) }, { 175, 5 }, 0 },
+  { { 6|(5<<4) }, { 193, 5 }, 0 },
+  { { 6|(6<<4) }, { 205, 5 }, 1 },
+  { { 6|(7<<4) }, { 217, 5 }, 0 },
+  // KC_GRV, KC_1, KC_2, KC_3, KC_4, KC_5, KC_6, KC_7, KC_8, KC_9, KC_0, KC_MINS, KC_EQL, KC_BSPC, KC_INS, KC_HOME, KC_PGUP
+  { { 1|(0<<4) }, { 7, 20 }, 0 },
+  { { 1|(1<<4) }, { 19, 20 }, 0 },
+  { { 1|(2<<4) }, { 31, 20 }, 0 },
+  { { 1|(3<<4) }, { 43, 20 }, 0 },
+  { { 1|(4<<4) }, { 55, 20 }, 0 },
+  { { 1|(5<<4) }, { 67, 20 }, 0 },
+  { { 1|(6<<4) }, { 79, 20 }, 0 },
+  { { 1|(7<<4) }, { 91, 20 }, 0 },
+  { { 7|(0<<4) }, { 103, 20 }, 0 },
+  { { 7|(1<<4) }, { 115, 20 }, 0 },
+  { { 7|(2<<4) }, { 127, 20 }, 0 },
+  { { 7|(3<<4) }, { 139, 20 }, 0 },
+  { { 7|(4<<4) }, { 151, 20 }, 0 },
+  { { 7|(5<<4) }, { 169, 20 }, 0 },
+  { { 7|(6<<4) }, { 193, 20 }, 0 },
+  { { 7|(7<<4) }, { 205, 20 }, 0 },
+  { { 9|(7<<4) }, { 217, 20 }, 0 },
+  // KC_TAB, KC_Q, KC_W, KC_E, KC_R, KC_T, KC_Y, KC_U, KC_I, KC_O, KC_P, KC_LBRC, KC_RBRC, KC_BSLS, KC_DEL, KC_END, KC_PGDN
+  { { 2|(0<<4) }, { 10, 30 }, 0 },
+  { { 2|(1<<4) }, { 25, 30 }, 0 },
+  { { 2|(2<<4) }, { 37, 30 }, 0 },
+  { { 2|(3<<4) }, { 49, 30 }, 0 },
+  { { 2|(4<<4) }, { 61, 30 }, 0 },
+  { { 2|(5<<4) }, { 73, 30 }, 0 },
+  { { 2|(6<<4) }, { 85, 30 }, 0 },
+  { { 2|(7<<4) }, { 97, 30 }, 0 },
+  { { 8|(0<<4) }, { 109, 30 }, 0 },
+  { { 8|(1<<4) }, { 121, 30 }, 0 },
+  { { 8|(2<<4) }, { 133, 30 }, 0 },
+  { { 8|(3<<4) }, { 145, 30 }, 0 },
+  { { 8|(4<<4) }, { 157, 30 }, 0 },
+  { { 8|(5<<4) }, { 172, 30 }, 0 },
+  { { 8|(6<<4) }, { 193, 30 }, 0 },
+  { { 8|(7<<4) }, { 205, 30 }, 0 },
+  { { 9|(6<<4) }, { 217, 30 }, 0 },
+  // KC_CAPS, KC_A, KC_S, KC_D, KC_F, KC_G, KC_H, KC_J, KC_K, KC_L, KC_SCLN, KC_QUOT, KC_ENT
+  { { 3|(0<<4) }, { 11, 39 }, 1 },
+  { { 3|(1<<4) }, { 28, 39 }, 0 },
+  { { 3|(2<<4) }, { 40, 39 }, 0 },
+  { { 3|(3<<4) }, { 52, 39 }, 0 },
+  { { 3|(4<<4) }, { 64, 39 }, 0 },
+  { { 3|(5<<4) }, { 76, 39 }, 0 },
+  { { 3|(6<<4) }, { 88, 39 }, 0 },
+  { { 3|(7<<4) }, { 100, 39 }, 0 },
+  { { 9|(0<<4) }, { 112, 39 }, 0 },
+  { { 9|(1<<4) }, { 124, 39 }, 0 },
+  { { 9|(2<<4) }, { 136, 39 }, 0 },
+  { { 9|(3<<4) }, { 148, 39 }, 0 },
+  { { 9|(4<<4) }, { 168, 39 }, 0 },
+  // KC_LSFT, KC_Z, KC_X, KC_C, KC_V, KC_B, KC_N, KC_M, KC_COMM, KC_DOT, KC_SLSH, KC_RSFT, KC_UP
+  { { 4|(0<<4) }, { 14, 49 }, 0 },
+  { { 4|(1<<4) }, { 34, 49 }, 0 },
+  { { 4|(2<<4) }, { 46, 49 }, 0 },
+  { { 4|(3<<4) }, { 58, 49 }, 0 },
+  { { 4|(4<<4) }, { 70, 49 }, 0 },
+  { { 4|(5<<4) }, { 82, 49 }, 0 },
+  { { 4|(6<<4) }, { 94, 49 }, 0 },
+  { { 4|(7<<4) }, { 106, 49 }, 0 },
+  { { 10|(0<<4) }, { 118, 49 }, 0 },
+  { { 10|(1<<4) }, { 130, 49 }, 0 },
+  { { 10|(2<<4) }, { 142, 49 }, 0 },
+  { { 10|(3<<4) }, { 165, 49 }, 0 },
+  { { 9|(5<<4) }, { 205, 49 }, 0 },
+  // KC_LCTL, KC_LGUI, KC_LALT, KC_SPC, KC_RALT, MO(1), KC_APP, KC_RCTL, KC_LEFT, KC_DOWN, KC_RGHT
+  { { 5|(0<<4) }, { 8, 59 }, 0 },
+  { { 5|(1<<4) }, { 23, 59 }, 0 },
+  { { 5|(2<<4) }, { 38, 59 }, 0 },
+  { { 5|(3<<4) }, { 83, 59 }, 0 },
+  { { 5|(4<<4) }, { 129, 59 }, 0 },
+  { { 5|(5<<4) }, { 144, 59 }, 0 },
+  { { 5|(6<<4) }, { 159, 59 }, 0 },
+  { { 5|(7<<4) }, { 174, 59 }, 0 },
+  { { 10|(4<<4) }, { 193, 59 }, 0 },
+  { { 10|(5<<4) }, { 205, 59 }, 0 },
+  { { 10|(6<<4) }, { 217, 59 }, 0 },
+  // Underglow / Border
+  { { 0xFF }, { 222, 64 }, 0 },
+  { { 0xFF }, { 204, 64 }, 0 },
+  { { 0xFF }, { 186, 64 }, 0 },
+  { { 0xFF }, { 167, 64 }, 0 },
+  { { 0xFF }, { 149, 64 }, 0 },
+  { { 0xFF }, { 130, 64 }, 0 },
+  { { 0xFF }, { 112, 64 }, 0 },
+  { { 0xFF }, { 94, 64 }, 0 },
+  { { 0xFF }, { 75, 64 }, 0 },
+  { { 0xFF }, { 57, 64 }, 0 },
+  { { 0xFF }, { 38, 64 }, 0 },
+  { { 0xFF }, { 20, 64 }, 0 },
+  { { 0xFF }, { 0, 64 }, 0 },
+  { { 0xFF }, { 0, 47 }, 0 },
+  { { 0xFF }, { 0, 32 }, 0 },
+  { { 0xFF }, { 0, 17 }, 0 },
+  { { 0xFF }, { 0, 0 }, 0 },
+  { { 0xFF }, { 20, 0 }, 0 },
+  { { 0xFF }, { 38, 0 }, 0 },
+  { { 0xFF }, { 57, 0 }, 0 },
+  { { 0xFF }, { 75, 0 }, 0 },
+  { { 0xFF }, { 94, 0 }, 0 },
+  { { 0xFF }, { 112, 0 }, 0 },
+  { { 0xFF }, { 130, 0 }, 0 },
+  { { 0xFF }, { 149, 0 }, 0 },
+  { { 0xFF }, { 167, 0 }, 0 },
+  { { 0xFF }, { 186, 0 }, 0 },
+  { { 0xFF }, { 204, 0 }, 0 },
+  { { 0xFF }, { 222, 1 }, 0 },
+  { { 0xFF }, { 224, 17 }, 0 },
+  { { 0xFF }, { 224, 32 }, 0 },
+  { { 0xFF }, { 224, 47 }, 0 },
+};
+
+#endif

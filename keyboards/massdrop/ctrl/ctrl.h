@@ -7,6 +7,7 @@
 
 #include "i2c_master.h"
 #include "led_matrix.h" //For led keycodes
+#include "rgb_matrix.h"
 #include "usb/udi_cdc.h"
 #include "usb/usb2422.h"
 
@@ -52,7 +53,6 @@ enum hid_pkt_req {
 	HID_PKT_REQ_COMMIT_LED_CONFIG,
   HID_PKT_REQ_LED_GET,
   HID_PKT_REQ_LEDS_GET,
-  HID_PKT_REQ_LED_PATTERN_SET,
 };
 
 enum hid_pkt_res {
