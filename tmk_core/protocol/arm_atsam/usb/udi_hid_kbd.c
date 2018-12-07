@@ -704,6 +704,8 @@ static void udi_hid_mou_report_sent(udd_ep_status_t status, iram_size_t nb_sent,
 //********************************************************************************************
 #ifdef RAW
 
+#include "raw_hid.h"
+
 bool udi_hid_raw_enable(void);
 void udi_hid_raw_disable(void);
 bool udi_hid_raw_setup(void);
@@ -737,11 +739,14 @@ COMPILER_WORD_ALIGNED
 static uint8_t udi_hid_raw_report_trans[UDI_HID_RAW_REPORT_SIZE];
 
 COMPILER_WORD_ALIGNED
+static uint8_t udi_hid_raw_report_recv[UDI_HID_RAW_REPORT_SIZE];
+
+COMPILER_WORD_ALIGNED
 UDC_DESC_STORAGE udi_hid_raw_report_desc_t udi_hid_raw_report_desc = {
     {
         0x06,         // Usage Page (Vendor Defined)
-        0xFF, 0xFF,
-        0x0A,         // Usage (Mouse)
+        0x60, 0xFF,
+        0x0A,         // Usage (Vendor Defined)
         0xFF, 0xFF,
         0xA1, 0x01,   // Collection (Application)
         0x75, 0x08,   //   Report Size (8)
@@ -761,6 +766,7 @@ static bool udi_hid_raw_setreport(void);
 static void udi_hid_raw_setreport_valid(void);
 
 static void udi_hid_raw_report_sent(udd_ep_status_t status, iram_size_t nb_sent, udd_ep_id_t ep);
+static void udi_hid_raw_report_rcvd(udd_ep_status_t status, iram_size_t nb_rcvd, udd_ep_id_t ep);
 
 bool udi_hid_raw_enable(void)
 {
@@ -798,7 +804,7 @@ static bool udi_hid_raw_setreport(void)
             && (UDI_HID_RAW_REPORT_SIZE == udd_g_ctrlreq.req.wLength)) {
         // Report OUT type on report ID 0 from USB Host
         udd_g_ctrlreq.payload = udi_hid_raw_report_set;
-        udd_g_ctrlreq.callback = udi_hid_raw_setreport_valid; //must call routine to transform setreport to LED state
+        udd_g_ctrlreq.callback = udi_hid_raw_setreport_valid;
         udd_g_ctrlreq.payload_size = UDI_HID_RAW_REPORT_SIZE;
         return true;
     }
@@ -815,7 +821,7 @@ bool udi_hid_raw_send_report(void)
         return false;
     }
 
-    memcpy(udi_hid_raw_report_trans, udi_hid_raw_report,UDI_HID_RAW_REPORT_SIZE);
+    memcpy(udi_hid_raw_report_trans, udi_hid_raw_report, UDI_HID_RAW_REPORT_SIZE);
     udi_hid_raw_b_report_valid = false;
     udi_hid_raw_b_report_trans_ongoing =
             udd_ep_run(UDI_HID_RAW_EP_IN | USB_EP_DIR_IN,
@@ -841,6 +847,34 @@ static void udi_hid_raw_report_sent(udd_ep_status_t status, iram_size_t nb_sent,
 static void udi_hid_raw_setreport_valid(void)
 {
 
+}
+
+void raw_hid_send(uint8_t *data, uint8_t length)
+{
+  if (main_b_raw_enable && !udi_hid_raw_b_report_trans_ongoing && length == UDI_HID_RAW_REPORT_SIZE) {
+    memcpy(udi_hid_raw_report, data, UDI_HID_RAW_REPORT_SIZE);
+    udi_hid_raw_send_report();
+  }
+}
+
+bool udi_hid_raw_receive_report(void)
+{
+  if (!main_b_raw_enable)
+  {
+    return false;
+  }
+
+  return udd_ep_run(UDI_HID_RAW_EP_OUT | USB_EP_DIR_OUT, false, udi_hid_raw_report_recv, UDI_HID_RAW_REPORT_SIZE, udi_hid_raw_report_rcvd);
+}
+
+static void udi_hid_raw_report_rcvd(udd_ep_status_t status, iram_size_t nb_rcvd, udd_ep_id_t ep)
+{
+  UNUSED(ep);
+
+  if (status == UDD_EP_TRANSFER_OK && nb_rcvd == UDI_HID_RAW_REPORT_SIZE)
+  {
+    UDI_HID_RAW_RECEIVE(udi_hid_raw_report_recv, UDI_HID_RAW_REPORT_SIZE);
+  }
 }
 
 #endif //RAW
