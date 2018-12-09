@@ -550,6 +550,22 @@ void rgb_matrix_digital_rain( const bool initialize ) {
     }
 }
 
+void rgb_matrix_breathing(void) {
+    uint8_t offset = (g_tick >> (3 - MIN(3, rgb_matrix_config.speed))) & 0xFF;
+    uint8_t breathing_step = offset << 1; // Going up
+    if (offset >> 7) breathing_step = 0xFF - breathing_step; // Going down
+    float f_step = (float)breathing_step;
+    float f_ratio = (f_step * f_step) / 65025;
+    float v = (float)rgb_matrix_config.val * f_ratio;
+    HSV hsv = {
+        .h = rgb_matrix_config.hue,
+        .s = rgb_matrix_config.sat,
+        .v = (uint8_t)v,
+    };
+    RGB rgb = hsv_to_rgb(hsv);
+    rgb_matrix_set_color_all(rgb.r, rgb.g, rgb.b);
+}
+
 void rgb_matrix_multisplash(void) {
     // if (g_any_key_hit < 0xFF) {
         HSV hsv = { .h = rgb_matrix_config.hue, .s = rgb_matrix_config.sat, .v = rgb_matrix_config.val };
@@ -772,6 +788,11 @@ void rgb_matrix_task(void) {
         #ifndef DISABLE_RGB_MATRIX_DIGITAL_RAIN
             case RGB_MATRIX_DIGITAL_RAIN:
                 rgb_matrix_digital_rain( initialize );
+                break;
+        #endif
+        #ifndef DISABLE_RGB_MATRIX_BREATHING
+            case RGB_MATRIX_BREATHING:
+                rgb_matrix_breathing();
                 break;
         #endif
         #ifdef RGB_MATRIX_KEYPRESSES
