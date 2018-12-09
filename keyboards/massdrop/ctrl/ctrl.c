@@ -26,38 +26,23 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
 #ifdef RGB_MATRIX_ENABLE
     case HID_PKT_REQ_CONFIG_LED_SET:
       {
-        /*
-        led_enabled = data[4] != 0;
-        if (data[5] <= LED_MODE_MAX_INDEX) led_lighting_mode = data[5];
-        if (data[6] <= LED_GCR_MAX) gcr_desired = data[6];
-        if (data[7] < led_setups_count + 1) led_animation_id = data[7];
-        led_animation_breathing = data[8] != 0;
-        led_animation_direction = data[9] != 0;
-        uint8_t new_speed_arr[4];
-        memcpy(new_speed_arr, &data[10], sizeof(float)); // WARNING: Assumes MCU is little ending/network byte order!
-        float new_speed = *(float *)(new_speed_arr);
-        if (new_speed < 0) new_speed = 0;
-        led_animation_speed = new_speed;
-        I2C3733_Control_Set(led_enabled);
-        if (led_animation_breathing) gcr_breathe = gcr_desired;
-        */
+        rgb_matrix_config.enable = data[4] != 0;
+        rgb_matrix_config.mode = data[5];
+        rgb_matrix_config.val = data[6];
+        rgb_matrix_config.sat = data[7];
+        rgb_matrix_config.hue = data[8] & 0xFF;
+        rgb_matrix_config.speed = data[9];
         raw_hid_send(send_buffer, RAW_EPSIZE);
         break;
       }
     case HID_PKT_REQ_CONFIG_LED_GET:
       {
-        /*
-        uint8_t* speed_arr = (uint8_t *)(&led_animation_speed); // WARNING: Assumes MCU is little endian/network byte order!
-        send_buffer[4] = led_enabled;
-        send_buffer[5] = led_lighting_mode;
-        send_buffer[6] = gcr_desired;
-        send_buffer[7] = gcr_breathe;
-        send_buffer[8] = gcr_actual;
-        send_buffer[9] = led_animation_id;
-        send_buffer[10] = led_animation_breathing;
-        send_buffer[11] = led_animation_direction;
-        memcpy(&send_buffer[12], speed_arr, sizeof(float));
-        */
+        send_buffer[4] = rgb_matrix_config.enable;
+        send_buffer[5] = rgb_matrix_config.mode;
+        send_buffer[6] = rgb_matrix_config.val;
+        send_buffer[7] = rgb_matrix_config.sat;
+        send_buffer[8] = rgb_matrix_config.hue & 0xFF;
+        send_buffer[9] = rgb_matrix_config.speed;
         raw_hid_send(send_buffer, RAW_EPSIZE);
         break;
       }
@@ -73,10 +58,12 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
         {
           uint8_t i = data[offset++]; // 1-based index
           if (i == 0) break; // 0 indicates no more in this set
-          uint8_t r = data[offset++];
-          uint8_t g = data[offset++];
-          uint8_t b = data[offset++];
-          rgb_matrix_set_color(i - 1, r, g, b);
+          if (i < ISSI3733_LED_COUNT) {
+            uint8_t r = data[offset++];
+            uint8_t g = data[offset++];
+            uint8_t b = data[offset++];
+            rgb_matrix_set_color(i - 1, r, g, b);
+          }
         }
         raw_hid_send(send_buffer, RAW_EPSIZE);
         break;
@@ -84,7 +71,6 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
     case HID_PKT_REQ_DEVICE_PARAMS:
       {
         send_buffer[4] = ISSI3733_LED_COUNT;
-        // WARNING: Assumes MCU is little endian/network byte order!
         float l, t, r, b, w, h;
         led_matrix_get_disp_size(&l, &t, &r, &b, &w, &h);
         uint8_t* l_arr = (uint8_t *)(&l);
@@ -111,7 +97,6 @@ void raw_hid_receive(uint8_t *data, uint8_t length) {
         float x, y;
         if (led_matrix_get(data[4], &send_buffer[4], &send_buffer[5], &send_buffer[6], &x, &y))
         {
-          // WARNING: Assumes MCU is little endian/network byte order!
           uint8_t* x_arr = (uint8_t *)(&x);
           uint8_t* y_arr = (uint8_t *)(&y);
           memcpy(&send_buffer[7], x_arr, 4);

@@ -52,6 +52,8 @@ void DMAC_0_Handler( void )
 issi3733_driver_t issidrv[ISSI3733_DRIVER_COUNT];
 issi3733_led_t led_map[ISSI3733_LED_COUNT] = ISSI3733_LED_MAP;
 
+RGB led_buffer[ISSI3733_LED_COUNT];
+
 uint8_t gcr_desired;
 uint8_t gcr_actual;
 uint8_t gcr_actual_last;
@@ -215,9 +217,9 @@ void led_matrix_get_disp_size(float* l, float* t, float* r, float* b, float* w, 
 uint8_t led_matrix_get(uint8_t i, uint8_t* r, uint8_t* g, uint8_t* b, float* x, float* y)
 {
   if (i >= ISSI3733_LED_COUNT) return false;
-  *r = *led_map[i].rgb.r;
-  *g = *led_map[i].rgb.g;
-  *b = *led_map[i].rgb.b;
+  *r = led_buffer[i].r;
+  *g = led_buffer[i].g;
+  *b = led_buffer[i].b;
   if (x != NULL) *x = led_map[i].x;
   if (y != NULL) *y = led_map[i].y;
   return true;
@@ -227,9 +229,9 @@ void led_set_one(int i, uint8_t r, uint8_t g, uint8_t b)
 {
   if (i < ISSI3733_LED_COUNT)
   {
-    *led_map[i].rgb.r = r;
-    *led_map[i].rgb.g = g;
-    *led_map[i].rgb.b = b;
+    led_buffer[i].r = r;
+    led_buffer[i].g = g;
+    led_buffer[i].b = b;
   }
 }
 
@@ -237,9 +239,9 @@ void led_set_all(uint8_t r, uint8_t g, uint8_t b)
 {
   for (uint8_t i = 0; i < ISSI3733_LED_COUNT; i++)
   {
-    *led_map[i].rgb.r = r;
-    *led_map[i].rgb.g = g;
-    *led_map[i].rgb.b = b;
+    led_buffer[i].r = r;
+    led_buffer[i].g = g;
+    led_buffer[i].b = b;
   }
 }
 
@@ -259,6 +261,14 @@ void flush(void)
   while (i2c_led_q_running)
   {
     CLK_delay_ms(20);
+  }
+
+  // Copy buffer to live DMA region
+  for (uint8_t i = 0; i < ISSI3733_LED_COUNT; i++)
+  {
+    *led_map[i].rgb.r = led_buffer[i].r;
+    *led_map[i].rgb.g = led_buffer[i].g;
+    *led_map[i].rgb.b = led_buffer[i].b;
   }
 
   uint8_t drvid;
