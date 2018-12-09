@@ -263,4 +263,11 @@ const rgb_led g_rgb_leds[DRIVER_LED_TOTAL] = {
   { { 0xFF }, { 224, 47 }, 0 },
 };
 
+#ifdef USB_LED_INDICATOR_ENABLE
+void rgb_matrix_indicators_kb(void)
+{
+  led_matrix_indicators();
+}
+#endif // USB_LED_INDICATOR_ENABLE
+
 #endif

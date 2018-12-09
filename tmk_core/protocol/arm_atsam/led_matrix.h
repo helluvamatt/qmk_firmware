@@ -101,4 +101,6 @@ void gcr_compute(void);
 void led_matrix_get_disp_size(float* l, float* t, float* r, float* b, float* w, float* h);
 uint8_t led_matrix_get(uint8_t i, uint8_t* r, uint8_t* g, uint8_t* b, float* x, float* y);
 
+void led_matrix_indicators(void);
+
 #endif //_LED_MATRIX_H_

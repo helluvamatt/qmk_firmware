@@ -287,6 +287,39 @@ void flush(void)
   i2c_led_q_run();
 }
 
+void led_matrix_indicators(void)
+{
+  uint8_t kbled = keyboard_leds();
+  if (kbled && rgb_matrix_config.enable)
+  {
+    for (uint8_t i = 0; i < ISSI3733_LED_COUNT; i++)
+    {
+      if (
+        #if USB_LED_NUM_LOCK_SCANCODE != 255
+        (led_map[i].scan == USB_LED_NUM_LOCK_SCANCODE && kbled & (1<<USB_LED_NUM_LOCK)) ||
+        #endif //NUM LOCK
+        #if USB_LED_CAPS_LOCK_SCANCODE != 255
+        (led_map[i].scan == USB_LED_CAPS_LOCK_SCANCODE && kbled & (1<<USB_LED_CAPS_LOCK)) ||
+        #endif //CAPS LOCK
+        #if USB_LED_SCROLL_LOCK_SCANCODE != 255
+        (led_map[i].scan == USB_LED_SCROLL_LOCK_SCANCODE && kbled & (1<<USB_LED_SCROLL_LOCK)) ||
+        #endif //SCROLL LOCK
+        #if USB_LED_COMPOSE_SCANCODE != 255
+        (led_map[i].scan == USB_LED_COMPOSE_SCANCODE && kbled & (1<<USB_LED_COMPOSE)) ||
+        #endif //COMPOSE
+        #if USB_LED_KANA_SCANCODE != 255
+        (led_map[i].scan == USB_LED_KANA_SCANCODE && kbled & (1<<USB_LED_KANA)) ||
+        #endif //KANA
+        (0))
+      {
+        led_buffer[i].r = 255;
+        led_buffer[i].g = 255;
+        led_buffer[i].b = 255;
+      }
+    }
+  }
+}
+
 const rgb_matrix_driver_t rgb_matrix_driver = {
   .init = init,
   .flush = flush,
